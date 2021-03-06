@@ -79,6 +79,14 @@ public class UVCCameraHelper {
         void onDisConnectDev(UsbDevice device);
     }
 
+    /**
+     * instantiate {@link #mUSBMonitor}
+     * create {@link #mCameraHandler} with {@link #mCamView} and {@link #previewWidth} and {@link #previewHeight}
+     * @see #createUVCCamera()
+     * @param activity
+     * @param cameraView
+     * @param listener
+     */
     public void initUSBMonitor(Activity activity, CameraViewInterface cameraView, final OnMyDevConnectListener listener) {
         this.mActivity = activity;
         this.mCamView = cameraView;
@@ -144,32 +152,45 @@ public class UVCCameraHelper {
         createUVCCamera();
     }
 
+    /**
+     * instantiate {@link #mCameraHandler} with {@link #mCamView} and {@link #previewWidth} and {@link #previewHeight}
+     */
     public void createUVCCamera() {
         if (mCamView == null)
             throw new NullPointerException("CameraViewInterface cannot be null!");
 
         // release resources for initializing camera handler
-        if (mCameraHandler != null) {
-            mCameraHandler.release();
-            mCameraHandler = null;
-        }
+        releaseCameraHandler();
         // initialize camera handler
         mCamView.setAspectRatio(previewWidth / (float)previewHeight);
         mCameraHandler = UVCCameraHandler.createHandler(mActivity, mCamView, 2,
                 previewWidth, previewHeight, mFrameFormat);
     }
 
+    /**
+     * update the resolution with selected width and height.
+     *
+     * It re-allocate memory for {@link #mCameraHandler}, set {@link #mCamView}'s ratio based on
+     * passed in width and height and restart the preview with the help of {@link #mCamView}
+     *
+     * @see #startPreview(CameraViewInterface)
+     * @param width
+     * @param height
+     */
     public void updateResolution(int width, int height) {
         if (previewWidth == width && previewHeight == height) {
             return;
         }
         this.previewWidth = width;
         this.previewHeight = height;
-        if (mCameraHandler != null) {
-            mCameraHandler.release();
-            mCameraHandler = null;
-        }
+
+        // release and null CameraHandler
+        releaseCameraHandler();
+
+        // set up the view
         mCamView.setAspectRatio(previewWidth / (float)previewHeight);
+
+        // re-allocate resources for CameraHandler
         mCameraHandler = UVCCameraHandler.createHandler(mActivity,mCamView, 2,
                 previewWidth, previewHeight, mFrameFormat);
         openCamera(mCtrlBlock);
@@ -188,12 +209,18 @@ public class UVCCameraHelper {
         }).start();
     }
 
+    /**
+     * register {@link #mUSBMonitor} for activity
+     */
     public void registerUSB() {
         if (mUSBMonitor != null) {
             mUSBMonitor.register();
         }
     }
 
+    /**
+     * unregister {@link #mUSBMonitor} for activity
+     */
     public void unregisterUSB() {
         if (mUSBMonitor != null) {
             mUSBMonitor.unregister();
@@ -293,17 +320,39 @@ public class UVCCameraHelper {
         return false;
     }
 
-    public void release() {
+    /**
+     * release {@link #mCameraHandler} occupied resources
+     */
+    public void releaseCameraHandler() {
         if (mCameraHandler != null) {
             mCameraHandler.release();
             mCameraHandler = null;
         }
+    }
+
+    /**
+     * release {@link #mUSBMonitor} occupied resources
+     */
+    public void releaseUSBMonitor() {
         if (mUSBMonitor != null) {
             mUSBMonitor.destroy();
             mUSBMonitor = null;
         }
     }
 
+    /**
+     * release resources that is been occupied by this object or
+     * its associated objects.
+     */
+    public void release() {
+        releaseCameraHandler();
+        releaseUSBMonitor();
+    }
+
+    /**
+     * get USBMonitor instance for activity
+     * @return
+     */
     public USBMonitor getUSBMonitor() {
         return mUSBMonitor;
     }
@@ -314,12 +363,20 @@ public class UVCCameraHelper {
         }
     }
 
+    /**
+     * requires {@link #mCameraHandler} to open camera device
+     * @param ctrlBlock
+     */
     private void openCamera(USBMonitor.UsbControlBlock ctrlBlock) {
         if (mCameraHandler != null) {
             mCameraHandler.open(ctrlBlock);
         }
     }
 
+    /**
+     * starts and shows camera preview with {@link #mCamView}
+     * @param cameraView
+     */
     public void startPreview(CameraViewInterface cameraView) {
         SurfaceTexture st = cameraView.getSurfaceTexture();
         if (mCameraHandler != null) {
@@ -339,6 +396,11 @@ public class UVCCameraHelper {
         }
     }
 
+    /**
+     * get a list of preview sizes (resolutions) for user to selected a
+     * specific camera preview size (resolution)
+     * @return
+     */
     public List<Size> getSupportedPreviewSizes() {
         if (mCameraHandler == null)
             return null;
